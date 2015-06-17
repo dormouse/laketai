@@ -11,7 +11,7 @@ import os
 import subprocess
 import sys
 
-# from dialogs import OpenDlg
+from dialogs import OpenDlg
 from editor import Editor
 from views import HtmlView, TreeView
 
@@ -19,6 +19,8 @@ from views import HtmlView, TreeView
 class MainWindow(QtGui.QMainWindow):
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
+
+        self.initAct()
 
         splitter = QtGui.QSplitter(QtCore.Qt.Horizontal)
         self.treeview = TreeView()
@@ -30,8 +32,60 @@ class MainWindow(QtGui.QMainWindow):
         splitter.addWidget(self.htmlview)
 
         self.setWindowTitle("Lake Tai")
-        self.setupMenus()
+        self.initMenu()
+        self.initToolbar()
+        self.initStatusBar()
         self.showMaximized()
 
-    def setupMenus(self):
-        pass
+    def initAct(self):
+        self.openPrjAct = QtGui.QAction(
+            QtGui.QIcon("images/open.png"),
+            "&Open Project",
+            self,
+            shortcut="Ctrl+O",
+            statusTip="Open Project",
+            triggered=self.openPrj
+        )
+
+        self.quitAct = QtGui.QAction(
+            QtGui.QIcon('images/quit.png'),
+            "&Close",
+            self,
+            shortcut=QtGui.QKeySequence.Close,
+            statusTip=u"Quit",
+            triggered=self.quit
+        )
+
+    def initMenu(self):
+        self.fileMenu = self.menuBar().addMenu("&Project")
+        self.fileMenu.addAction(self.openPrjAct)
+        self.menuBar().addSeparator()
+        self.fileMenu.addAction(self.quitAct)
+
+    def initToolbar(self):
+        self.prjToolBar = self.addToolBar("prj")
+        self.prjToolBar.addAction(self.openPrjAct)
+
+        self.proToolBar = self.addToolBar("pro")
+        self.proToolBar.addAction(self.quitAct)
+
+    def initStatusBar(self):
+        self.statusBar().showMessage("Ready")
+
+    def openPrj(self, prj_path=None):
+        if prj_path:
+            pass
+        else:
+            dlg = QtGui.QFileDialog()
+            dlg.setFileMode(dlg.DirectoryOnly)
+            dlg.setOption(dlg.ShowDirsOnly, True)
+            prj_path = dlg.getExistingDirectory(
+                self,
+                'Please select project path',
+                '',
+            )
+
+
+
+    def quit(self):
+        self.close()
