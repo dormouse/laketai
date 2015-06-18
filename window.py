@@ -15,12 +15,15 @@ from dialogs import OpenDlg
 from editor import Editor
 from views import HtmlView, TreeView
 
+PRJ_NAME = u'Lake Tai'
+DEFAULT_INDEX = u'index.rst'
+
 
 class MainWindow(QtGui.QMainWindow):
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
 
-        self.initAct()
+        self.prj_path = None
 
         splitter = QtGui.QSplitter(QtCore.Qt.Horizontal)
         self.treeview = TreeView()
@@ -31,7 +34,8 @@ class MainWindow(QtGui.QMainWindow):
         splitter.addWidget(self.editor)
         splitter.addWidget(self.htmlview)
 
-        self.setWindowTitle("Lake Tai")
+        self.setWindowTitle(PRJ_NAME)
+        self.initAct()
         self.initMenu()
         self.initToolbar()
         self.initStatusBar()
@@ -73,19 +77,33 @@ class MainWindow(QtGui.QMainWindow):
         self.statusBar().showMessage("Ready")
 
     def openPrj(self, prj_path=None):
+        if not prj_path:
+            dlg = OpenDlg()
+            prj_path = dlg.getExistingDirectory(self)
+
         if prj_path:
-            pass
-        else:
-            dlg = QtGui.QFileDialog()
-            dlg.setFileMode(dlg.DirectoryOnly)
-            dlg.setOption(dlg.ShowDirsOnly, True)
-            prj_path = dlg.getExistingDirectory(
-                self,
-                'Please select project path',
-                '',
-            )
+            try:
+                sys.path.insert(0, prj_path)
+                import conf
+            except:
+                return
 
+            self.setWindowTitle(PRJ_NAME + u' -- ' + conf.project)
+            self.prj_path = prj_path
+            self.handleFileChanged()
 
+    def handleFileChanged(self, filename=None):
+        if not filename:
+            filename = DEFAULT_INDEX
+        full_filename = os.path.join(self.prj_path, filename)
+        html_filename = u'_build/html/%s.html' %\
+            os.path.splitext(filename)[0]
+        full_html_filename = os.path.join(self.prj_path, html_filename)
+        print full_html_filename
+
+        self.treeview.load_dir(self.prj_path)
+        self.editor.openFile(full_filename)
+        self.htmlview.load_html(full_html_filename)
 
     def quit(self):
         self.close()
