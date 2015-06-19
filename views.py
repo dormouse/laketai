@@ -32,12 +32,10 @@ class TreeView(QtGui.QTreeView):
         model.setRootPath(dir_path)
         self.setModel(model)
 
-        indexRoot = model.index(model.rootPath())
-        self.setRootIndex(indexRoot)
+        index_root = model.index(model.rootPath())
+        self.setRootIndex(index_root)
 
-        self.hideUnwantedInfo()
-
-    def hideUnwantedInfo(self):
+        # hide unwanted info
         self.hideColumn(1)
         self.hideColumn(2)
         self.hideColumn(3)
@@ -48,5 +46,6 @@ class TreeView(QtGui.QTreeView):
         indexes = selected.indexes()
         if indexes:
             new_filename = self.model().data(indexes[0])
+            print new_filename
             main_win = self.parent().parent()
-            main_win.handleFileChanged(new_filename)
+            main_win.handle_file_changed(new_filename)

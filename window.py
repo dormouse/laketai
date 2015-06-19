@@ -17,6 +17,7 @@ from views import HtmlView, TreeView
 
 PRJ_NAME = u'Lake Tai'
 DEFAULT_INDEX = u'index.rst'
+DEFAULT_CONF = u'conf.py'
 
 
 class MainWindow(QtGui.QMainWindow):
@@ -35,20 +36,20 @@ class MainWindow(QtGui.QMainWindow):
         splitter.addWidget(self.htmlview)
 
         self.setWindowTitle(PRJ_NAME)
-        self.initAct()
-        self.initMenu()
-        self.initToolbar()
-        self.initStatusBar()
+        self.init_act()
+        self.init_menu()
+        self.init_toolbar()
+        self.init_statusbar()
         self.showMaximized()
 
-    def initAct(self):
+    def init_act(self):
         self.openPrjAct = QtGui.QAction(
             QtGui.QIcon("images/open.png"),
             "&Open Project",
             self,
             shortcut="Ctrl+O",
             statusTip="Open Project",
-            triggered=self.openPrj
+            triggered=self.open_prj
         )
 
         self.quitAct = QtGui.QAction(
@@ -60,39 +61,52 @@ class MainWindow(QtGui.QMainWindow):
             triggered=self.quit
         )
 
-    def initMenu(self):
+    def init_menu(self):
         self.fileMenu = self.menuBar().addMenu("&Project")
         self.fileMenu.addAction(self.openPrjAct)
         self.menuBar().addSeparator()
         self.fileMenu.addAction(self.quitAct)
 
-    def initToolbar(self):
+    def init_toolbar(self):
         self.prjToolBar = self.addToolBar("prj")
         self.prjToolBar.addAction(self.openPrjAct)
 
         self.proToolBar = self.addToolBar("pro")
         self.proToolBar.addAction(self.quitAct)
 
-    def initStatusBar(self):
+    def init_statusbar(self):
         self.statusBar().showMessage("Ready")
 
-    def openPrj(self, prj_path=None):
+    def open_prj(self, prj_path=None):
         if not prj_path:
             dlg = OpenDlg()
             prj_path = dlg.getExistingDirectory(self)
 
         if prj_path:
-            try:
-                sys.path.insert(0, prj_path)
-                import conf
-            except:
-                return
+            full_conf_filename = os.path.join(prj_path, DEFAULT_CONF)
+            if os.path.exists(full_conf_filename):
+                try:
+                    sys.path.insert(0, prj_path)
+                    import conf
+                except Exception as e:
+                    QtGui.QErrorMessage().showMessage(e)
+                    return
 
-            self.setWindowTitle(PRJ_NAME + u' -- ' + conf.project)
-            self.prj_path = prj_path
-            self.handleFileChanged()
+                self.setWindowTitle(PRJ_NAME + u' -- ' + conf.project)
+                self.prj_path = prj_path
+                self.handle_file_changed()
+            else:
+                reply = QtGui.QMessageBox.information(
+                    self,
+                    u"Warning!",
+                    u"Can not find conf.py!"
+                )
+                if reply == QtGui.QMessageBox.Ok:
+                    return
+                else:
+                    return
 
-    def handleFileChanged(self, filename=None):
+    def handle_file_changed(self, filename=None):
         if not filename:
             filename = DEFAULT_INDEX
         full_filename = os.path.join(self.prj_path, filename)
