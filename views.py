@@ -45,7 +45,6 @@ class TreeView(QtGui.QTreeView):
         super(TreeView, self).selectionChanged(selected, deselected)
         indexes = selected.indexes()
         if indexes:
-            new_filename = self.model().data(indexes[0])
-            print new_filename
+            new_filename = self.model().filePath(indexes[0])
             main_win = self.parent().parent()
             main_win.handle_file_changed(new_filename)
