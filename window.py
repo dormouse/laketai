@@ -143,10 +143,9 @@ class MainWindow(QtGui.QMainWindow):
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT
         )
-        print "bt1"
         proc.wait()
-        print "bt2"
-        print self.htmlname
+        info = '\n'.join([line for line in proc.stdout])
+        QtGui.QMessageBox.information(self, "Build Info", info)
         self.htmlview.load_html(self.htmlname)
 
     def open_prj(self, prj_path=None):
