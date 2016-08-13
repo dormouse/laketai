@@ -4,19 +4,23 @@
 import sys
 import markups
 
-from PyQt5.QtCore import QFile, QFileInfo, QIODevice, QLibraryInfo, QTextStream, QTranslator, QUrl
+from PyQt5.QtCore import (QFile, QFileInfo, QPoint, QSettings, QSignalMapper,
+        QSize, QTextStream, QUrl, Qt, QCoreApplication)
+QCoreApplication.
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QTextEdit,
                              QSplitter, QTreeView, QAction, QFileDialog
                              )
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtGui import QIcon, QKeySequence
-from PyQt5.QtCore import Qt
 
 PRJ_NAME = 'markdown editor'
 
 class Editor(QTextEdit):
-    def __init__(self, parent=None):
-        super(Editor, self).__init__(parent)
+    def __init__(self, topwin):
+        super(Editor, self).__init__()
+        self.topwin = topwin
+        self.textChanged.connect(self.on_text_changed)
+        self.markup = markups.ReStructuredTextMarkup()
         self.open_file_test()
 
     def open_file(self, path=None):
@@ -24,6 +28,22 @@ class Editor(QTextEdit):
             text = f.read()
             self.setText(text)
 
+
+    def on_text_changed(self):
+        self.update_html()
+        self.setFocus()
+
+    def update_html(self):
+        txt = self.toPlainText()
+        print (txt)
+        # todo
+        # 出错处理
+        try:
+            html = self.markup.convert(txt).get_document_body()
+            self.topwin.htmlview.setHtml(html)
+            self.topwin.show_error_msg("mark up parse ok!")
+        except:
+            self.topwin.show_error_msg("mark up parse error!")
 
     def open_file_test(self):
         test_rst = """
@@ -39,13 +59,7 @@ first section
 
 112
 """
-        self.setText(test_rst)
-        markup = markups.ReStructuredTextMarkup()
-        # todo
-        # 出错处理
-        html = markup.convert(test_rst).get_document_body()
-
-        self.parent().htmlview.setHtml(html)
+        self.setPlainText(test_rst)
 
 
 class HtmlView(QWebEngineView):
@@ -110,8 +124,7 @@ class MainWindow(QMainWindow):
         self.init_menu()
         self.init_toolbar()
         self.init_statusbar()
-
-        self.setGeometry(300, 300, 650, 600)
+        self.read_settings()
         self.show()
 
     def init_act(self):
@@ -157,6 +170,23 @@ class MainWindow(QMainWindow):
 
     def init_statusbar(self):
         self.statusBar().showMessage("Ready")
+
+    def show_error_msg(self, msg):
+        self.statusBar().showMessage(msg)
+
+    def read_settings(self):
+        settings = QSettings("Dormouse", "LakeTai")
+        print ("hh:", settings.fileName())
+
+        pos = settings.value("pos", QPoint(200, 200))
+        size = settings.value("size", QSize(400, 400))
+        self.resize(size)
+        self.move(pos)
+
+    def write_settings(self):
+        settings = QSettings("Dormouse", "LakeTai")
+        settings.setValue("pos", self.pos())
+        settings.setValue("size", self.size())
 
     def open_file(self):
         pre_file_path = '~'
