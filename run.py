@@ -6,9 +6,9 @@ import markups
 
 from PyQt5.QtCore import (QFile, QFileInfo, QPoint, QSettings, QSignalMapper,
         QSize, QTextStream, QUrl, Qt, QCoreApplication)
-QCoreApplication.
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QTextEdit,
-                             QSplitter, QTreeView, QAction, QFileDialog
+                             QSplitter, QTreeView, QAction, QFileDialog,
+                             QMessageBox,
                              )
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtGui import QIcon, QKeySequence
@@ -36,13 +36,13 @@ class Editor(QTextEdit):
     def update_html(self):
         txt = self.toPlainText()
         print (txt)
-        # todo
-        # 出错处理
         try:
             html = self.markup.convert(txt).get_document_body()
             self.topwin.htmlview.setHtml(html)
             self.topwin.show_error_msg("mark up parse ok!")
         except:
+            # todo
+            # 显示更详细的出错信息
             self.topwin.show_error_msg("mark up parse error!")
 
     def open_file_test(self):
@@ -110,14 +110,14 @@ class MainWindow(QMainWindow):
 
         self.prj_path = None
 
-        splitter = QSplitter(Qt.Horizontal)
+        self.splitter = QSplitter(Qt.Horizontal)
         # self.treeview = TreeView()
         self.htmlview = HtmlView(self)
         self.editor = Editor(self)
-        self.setCentralWidget(splitter)
+        self.setCentralWidget(self.splitter)
         # splitter.addWidget(self.treeview)
-        splitter.addWidget(self.editor)
-        splitter.addWidget(self.htmlview)
+        self.splitter.addWidget(self.editor)
+        self.splitter.addWidget(self.htmlview)
 
         self.setWindowTitle(PRJ_NAME)
         self.init_act()
@@ -176,17 +176,21 @@ class MainWindow(QMainWindow):
 
     def read_settings(self):
         settings = QSettings("Dormouse", "LakeTai")
-        print ("hh:", settings.fileName())
-
-        pos = settings.value("pos", QPoint(200, 200))
-        size = settings.value("size", QSize(400, 400))
-        self.resize(size)
-        self.move(pos)
+        # main window
+        self.move(settings.value("mainwin/pos", QPoint(200, 200)))
+        self.resize(settings.value("mainwin/size", QSize(400, 400)))
+        # splitter
+        self.splitter.setSizes(settings.value("splitter/sizes", [1000,1000]))
+        self.splitter.setStretchFactor(0,50)
+        self.splitter.setStretchFactor(1,50)
 
     def write_settings(self):
         settings = QSettings("Dormouse", "LakeTai")
-        settings.setValue("pos", self.pos())
-        settings.setValue("size", self.size())
+        # main window
+        settings.setValue("mainwin/pos", self.pos())
+        settings.setValue("mainwin/size", self.size())
+        # splitter
+        settings.setValue("splitter/sizes", self.splitter.sizes())
 
     def open_file(self):
         pre_file_path = '~'
@@ -213,12 +217,12 @@ class MainWindow(QMainWindow):
                 self.prj_path = prj_path
                 self.handle_file_changed()
             else:
-                reply = QtGui.QMessageBox.information(
+                reply = QMessageBox.information(
                     self,
                     u"Warning!",
                     u"Can not find conf.py!"
                 )
-                if reply == QtGui.QMessageBox.Ok:
+                if reply == QMessageBox.Ok:
                     return
                 else:
                     return
@@ -237,6 +241,20 @@ class MainWindow(QMainWindow):
 
     def quit(self):
         self.close()
+
+
+    def closeEvent(self, event):
+        reply = QMessageBox.question(self,
+                                     'Message',
+                                     'Are you sure to quit?',
+                                     QMessageBox.Yes,
+                                     QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            self.write_settings()
+            event.accept()
+        else:
+            event.ignore()
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
