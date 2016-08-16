@@ -1,6 +1,7 @@
 #!/bin/env python3
 # -*- coding: utf8 -*-
 
+import os
 import sys
 import markups
 
@@ -8,12 +9,14 @@ from PyQt5.QtCore import (QFile, QFileInfo, QPoint, QSettings, QSignalMapper,
         QSize, QTextStream, QUrl, Qt, QCoreApplication)
 from PyQt5.QtWidgets import (QMainWindow, QApplication, QTextEdit,
                              QSplitter, QTreeView, QAction, QFileDialog,
-                             QMessageBox,
+                             QMessageBox, QErrorMessage, QFileSystemModel
                              )
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtGui import QIcon, QKeySequence
 
-PRJ_NAME = 'markdown editor'
+PRJ_NAME = u'Lake Tai'
+DEFAULT_INDEX = u'index.rst'
+DEFAULT_CONF = u'conf.py'
 
 class Editor(QTextEdit):
     def __init__(self, topwin):
@@ -21,7 +24,6 @@ class Editor(QTextEdit):
         self.topwin = topwin
         self.textChanged.connect(self.on_text_changed)
         self.markup = markups.ReStructuredTextMarkup()
-        self.open_file_test()
 
     def open_file(self, path=None):
         with open(path, 'r') as f:
@@ -36,6 +38,8 @@ class Editor(QTextEdit):
     def update_html(self):
         txt = self.toPlainText()
         print (txt)
+        ## test
+        aa = markups.ReStructuredTextMarkup()
         try:
             html = self.markup.convert(txt).get_document_body()
             self.topwin.htmlview.setHtml(html)
@@ -44,22 +48,6 @@ class Editor(QTextEdit):
             # todo
             # 显示更详细的出错信息
             self.topwin.show_error_msg("mark up parse error!")
-
-    def open_file_test(self):
-        test_rst = """
-12
-===========
-
-123
-
-456
-
-first section
--------------
-
-112
-"""
-        self.setPlainText(test_rst)
 
 
 class HtmlView(QWebEngineView):
@@ -82,7 +70,7 @@ class TreeView(QTreeView):
 
         self.dir_path = dir_path
 
-        model = QtGui.QFileSystemModel()
+        model = QFileSystemModel()
         model.setRootPath(dir_path)
         self.setModel(model)
 
@@ -111,11 +99,11 @@ class MainWindow(QMainWindow):
         self.prj_path = None
 
         self.splitter = QSplitter(Qt.Horizontal)
-        # self.treeview = TreeView()
+        self.treeview = TreeView()
         self.htmlview = HtmlView(self)
         self.editor = Editor(self)
         self.setCentralWidget(self.splitter)
-        # splitter.addWidget(self.treeview)
+        self.splitter.addWidget(self.treeview)
         self.splitter.addWidget(self.editor)
         self.splitter.addWidget(self.htmlview)
 
@@ -128,30 +116,14 @@ class MainWindow(QMainWindow):
         self.show()
 
     def init_act(self):
-        """
-        self.openPrjAct = QAction(
-            QIcon("images/open.png"),
-            "&Open Project",
-            self,
+        self.act_open_prj = QAction(
+            QIcon("images/open.png"), "&Open Project", self,
             shortcut="Ctrl+O",
             statusTip="Open Project",
             triggered=self.open_prj
         )
-        """
-        self.act_open_file = QAction(
-            QIcon("images/open.png"),
-            "&Open File",
-            self,
-            shortcut="Ctrl+O",
-            statusTip="Open File",
-            triggered=self.open_file
-        )
-
-
         self.act_quit = QAction(
-            QIcon('images/quit.png'),
-            "&Close",
-            self,
+            QIcon('images/quit.png'), "&Close", self,
             shortcut=QKeySequence.Close,
             statusTip=u"Quit",
             triggered=self.quit
@@ -159,13 +131,13 @@ class MainWindow(QMainWindow):
 
     def init_menu(self):
         self.fileMenu = self.menuBar().addMenu("&File")
-        self.fileMenu.addAction(self.act_open_file)
+        self.fileMenu.addAction(self.act_open_prj)
         self.menuBar().addSeparator()
         self.fileMenu.addAction(self.act_quit)
 
     def init_toolbar(self):
         self.file_toolbar = self.addToolBar("file")
-        self.file_toolbar.addAction(self.act_open_file)
+        self.file_toolbar.addAction(self.act_open_prj)
         self.file_toolbar.addAction(self.act_quit)
 
     def init_statusbar(self):
@@ -180,7 +152,7 @@ class MainWindow(QMainWindow):
         self.move(settings.value("mainwin/pos", QPoint(200, 200)))
         self.resize(settings.value("mainwin/size", QSize(400, 400)))
         # splitter
-        self.splitter.setSizes(settings.value("splitter/sizes", [1000,1000]))
+        self.splitter.setSizes(settings.value("splitter/sizes", [300,500,500]))
         self.splitter.setStretchFactor(0,50)
         self.splitter.setStretchFactor(1,50)
 
@@ -199,21 +171,26 @@ class MainWindow(QMainWindow):
             self.editor.open_file(fname[0])
 
     def open_prj(self, prj_path=None):
+        default_path = '/Users/dormouse/test'
         if not prj_path:
-            dlg = OpenDlg()
-            prj_path = dlg.getExistingDirectory(self)
-
+            options = QFileDialog.Options()
+            options |= QFileDialog.ShowDirsOnly
+            prj_path= QFileDialog.getExistingDirectory(self,
+                                                       "QFileDialog.getOpenFileNames()",
+                                                       default_path,
+                                                       options=options)
         if prj_path:
             full_conf_filename = os.path.join(prj_path, DEFAULT_CONF)
             if os.path.exists(full_conf_filename):
                 try:
                     sys.path.insert(0, prj_path)
-                    import conf
+                    # import conf
                 except Exception as e:
-                    QtGui.QErrorMessage().showMessage(e)
-                    return
+                    pass
+                    # QErrorMessage().showMessage(e)
 
-                self.setWindowTitle(PRJ_NAME + u' -- ' + conf.project)
+
+                # self.setWindowTitle(PRJ_NAME + u' -- ' + conf.project)
                 self.prj_path = prj_path
                 self.handle_file_changed()
             else:
@@ -236,8 +213,8 @@ class MainWindow(QMainWindow):
         full_html_filename = os.path.join(self.prj_path, html_filename)
 
         self.treeview.load_dir(self.prj_path)
-        self.editor.openFile(full_filename)
-        self.htmlview.load_html(full_html_filename)
+        self.editor.open_file(full_filename)
+        # self.htmlview.load_html(full_html_filename)
 
     def quit(self):
         self.close()
