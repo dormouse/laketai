@@ -42,6 +42,7 @@ class Editor(QTextEdit):
         aa = markups.ReStructuredTextMarkup()
         try:
             html = self.markup.convert(txt).get_document_body()
+            print (html)
             self.topwin.htmlview.setHtml(html)
             self.topwin.show_error_msg("mark up parse ok!")
         except:
@@ -125,8 +126,9 @@ class MainWindow(QMainWindow):
         self.act_quit = QAction(
             QIcon('images/quit.png'), "&Close", self,
             shortcut=QKeySequence.Close,
-            statusTip=u"Quit",
-            triggered=self.quit
+            statusTip="Quit",
+            triggered=self.quit,
+            menuRole=QAction.QuitRole #  More like OSX native app
         )
 
     def init_menu(self):
