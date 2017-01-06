@@ -3,25 +3,24 @@
 
 import os
 import sys
-import markups
 
-from PyQt5.QtCore import (QFile, QFileInfo, QPoint, QSettings, QSignalMapper,
-        QSize, QTextStream, QUrl, Qt, QCoreApplication)
-from PyQt5.QtWidgets import (QMainWindow, QApplication, QTextEdit,
-                             QSplitter, QTreeView, QAction, QFileDialog,
-                             QMessageBox, QErrorMessage, QFileSystemModel
-                             )
+import markups
+from PyQt5.QtCore import (Qt, QPoint, QSettings, QSize, QUrl)
+from PyQt5.QtGui import (QIcon, QKeySequence)
 from PyQt5.QtWebEngineWidgets import QWebEngineView
-from PyQt5.QtGui import QIcon, QKeySequence
+from PyQt5.QtWidgets import (QAction, QApplication, QDockWidget,
+                             QFileDialog, QFileSystemModel,
+                             QMainWindow, QMessageBox,
+                             QTextEdit, QTreeView)
+from docutils.core import publish_parts
 
 PRJ_NAME = u'Lake Tai'
 DEFAULT_INDEX = u'index.rst'
 DEFAULT_CONF = u'conf.py'
 
-class Editor(QTextEdit):
-    def __init__(self, topwin):
-        super(Editor, self).__init__()
-        self.topwin = topwin
+class TextEdit(QTextEdit):
+    def __init__(self, parent = None):
+        super(TextEdit, self).__init__(parent)
         self.textChanged.connect(self.on_text_changed)
         self.markup = markups.ReStructuredTextMarkup()
 
@@ -36,19 +35,21 @@ class Editor(QTextEdit):
         self.setFocus()
 
     def update_html(self):
-        txt = self.toPlainText()
-        print (txt)
-        ## test
-        aa = markups.ReStructuredTextMarkup()
+        text = self.toPlainText()
+        extra_settings = {'initial_header_level': 4,
+                          'doctitle_xform': 0,
+                          'syntax_highlight': 'short',
+                          'stylesheet - path': 'html4css1.css',
+                          'embed-stylesheet': 'no'
+                          }
         try:
-            html = self.markup.convert(txt).get_document_body()
-            print (html)
-            self.topwin.htmlview.setHtml(html)
-            self.topwin.show_error_msg("mark up parse ok!")
+            html = publish_parts(text, writer_name='html', settings_overrides=extra_settings)['whole']
+            self.parent().previewView.setHtml(html)
+            self.parent().showErrorMsg("mark up parse ok!")
         except:
             # todo
             # 显示更详细的出错信息
-            self.topwin.show_error_msg("mark up parse error!")
+            self.parent().showErrorMsg("mark up parse error!")
 
 
 class HtmlView(QWebEngineView):
@@ -92,31 +93,23 @@ class TreeView(QTreeView):
             main_win = self.parent().parent()
             main_win.handle_file_changed(new_filename)
 
-
 class MainWindow(QMainWindow):
-    def __init__(self, parent=None):
-        super(MainWindow, self).__init__(parent)
+    def __init__(self):
+        super(MainWindow, self).__init__()
 
-        self.prj_path = None
+        self.textEdit = TextEdit(self)
+        self.setCentralWidget(self.textEdit)
 
-        self.splitter = QSplitter(Qt.Horizontal)
-        self.treeview = TreeView()
-        self.htmlview = HtmlView(self)
-        self.editor = Editor(self)
-        self.setCentralWidget(self.splitter)
-        self.splitter.addWidget(self.treeview)
-        self.splitter.addWidget(self.editor)
-        self.splitter.addWidget(self.htmlview)
+        self.createActions()
+        self.createMenus()
+        self.createToolBars()
+        self.createStatusBar()
+        self.createDockWindows()
 
-        self.setWindowTitle(PRJ_NAME)
-        self.init_act()
-        self.init_menu()
-        self.init_toolbar()
-        self.init_statusbar()
-        self.read_settings()
-        self.show()
+        self.readSettings()
+        self.setWindowTitle("Lake Tai")
 
-    def init_act(self):
+    def createActions(self):
         self.act_open_prj = QAction(
             QIcon("images/open.png"), "&Open Project", self,
             shortcut="Ctrl+O",
@@ -131,61 +124,73 @@ class MainWindow(QMainWindow):
             menuRole=QAction.QuitRole #  More like OSX native app
         )
 
-    def init_menu(self):
+    def createToolBars(self):
+        self.file_toolbar = self.addToolBar("file")
+        self.file_toolbar.addAction(self.act_open_prj)
+        self.file_toolbar.addAction(self.act_quit)
+
+    def createStatusBar(self):
+        self.statusBar().showMessage("Ready")
+
+    def createMenus(self):
         self.fileMenu = self.menuBar().addMenu("&File")
         self.fileMenu.addAction(self.act_open_prj)
         self.menuBar().addSeparator()
         self.fileMenu.addAction(self.act_quit)
 
-    def init_toolbar(self):
-        self.file_toolbar = self.addToolBar("file")
-        self.file_toolbar.addAction(self.act_open_prj)
-        self.file_toolbar.addAction(self.act_quit)
+        self.viewMenu = self.menuBar().addMenu("&View")
 
-    def init_statusbar(self):
-        self.statusBar().showMessage("Ready")
+    def createDockWindows(self):
+        # dock for project files
+        dock = QDockWidget("Project", self)
+        dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.projectTreeView= TreeView(dock)
+        dock.setWidget(self.projectTreeView)
+        self.addDockWidget(Qt.LeftDockWidgetArea, dock)
+        self.viewMenu.addAction(dock.toggleViewAction())
 
-    def show_error_msg(self, msg):
-        self.statusBar().showMessage(msg)
+        # dock for html preview
+        dock = QDockWidget("Preview", self)
+        dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.previewView= HtmlView(dock)
+        dock.setWidget(self.previewView)
+        self.addDockWidget(Qt.RightDockWidgetArea, dock)
+        self.viewMenu.addAction(dock.toggleViewAction())
 
-    def read_settings(self):
+    def readSettings(self):
         settings = QSettings("Dormouse", "LakeTai")
         # main window
         self.move(settings.value("mainwin/pos", QPoint(200, 200)))
         self.resize(settings.value("mainwin/size", QSize(400, 400)))
-        # splitter
-        self.splitter.setSizes(settings.value("splitter/sizes", [300,500,500]))
-        self.splitter.setStretchFactor(0,50)
-        self.splitter.setStretchFactor(1,50)
 
-    def write_settings(self):
+    def writeSettings(self):
         settings = QSettings("Dormouse", "LakeTai")
         # main window
         settings.setValue("mainwin/pos", self.pos())
         settings.setValue("mainwin/size", self.size())
-        # splitter
-        settings.setValue("splitter/sizes", self.splitter.sizes())
 
-    def open_file(self):
-        pre_file_path = '~'
-        fname = QFileDialog.getOpenFileName(self, 'Open file', pre_file_path)
-        if fname[0]:
-            self.editor.open_file(fname[0])
+    def showErrorMsg(self, msg):
+        self.statusBar().showMessage(msg)
 
-    def open_prj(self, prj_path=None):
+    def addRecentPrjPath(self, path):
+        settings = QSettings("Dormouse", "LakeTai")
+
+    def open_prj(self, prjPath=None):
         default_path = '/Users/dormouse/test'
-        if not prj_path:
+        if not prjPath:
             options = QFileDialog.Options()
             options |= QFileDialog.ShowDirsOnly
-            prj_path= QFileDialog.getExistingDirectory(self,
-                                                       "QFileDialog.getOpenFileNames()",
-                                                       default_path,
-                                                       options=options)
-        if prj_path:
-            full_conf_filename = os.path.join(prj_path, DEFAULT_CONF)
+            prjPath= QFileDialog.getExistingDirectory(
+                self,
+                "QFileDialog.getOpenFileNames()",
+                default_path,
+                options=options
+            )
+        if prjPath:
+            full_conf_filename = os.path.join(prjPath, DEFAULT_CONF)
             if os.path.exists(full_conf_filename):
                 try:
-                    sys.path.insert(0, prj_path)
+                    sys.path.insert(0, prjPath)
                     # import conf
                 except Exception as e:
                     pass
@@ -193,7 +198,8 @@ class MainWindow(QMainWindow):
 
 
                 # self.setWindowTitle(PRJ_NAME + u' -- ' + conf.project)
-                self.prj_path = prj_path
+                self.prj_path = prjPath
+                self.addRecentPrjPath(prjPath)
                 self.handle_file_changed()
             else:
                 reply = QMessageBox.information(
@@ -214,8 +220,8 @@ class MainWindow(QMainWindow):
             os.path.splitext(filename)[0]
         full_html_filename = os.path.join(self.prj_path, html_filename)
 
-        self.treeview.load_dir(self.prj_path)
-        self.editor.open_file(full_filename)
+        self.projectTreeView.load_dir(self.prj_path)
+        self.textEdit.open_file(full_filename)
         # self.htmlview.load_html(full_html_filename)
 
     def quit(self):
@@ -229,7 +235,7 @@ class MainWindow(QMainWindow):
                                      QMessageBox.Yes,
                                      QMessageBox.No)
         if reply == QMessageBox.Yes:
-            self.write_settings()
+            self.writeSettings()
             event.accept()
         else:
             event.ignore()
@@ -237,5 +243,6 @@ class MainWindow(QMainWindow):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    window = MainWindow()
+    mainWin = MainWindow()
+    mainWin.show()
     sys.exit(app.exec_())
