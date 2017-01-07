@@ -22,20 +22,20 @@ DEFAULT_CONF = u'conf.py'
 class TextEdit(QTextEdit):
     def __init__(self, parent = None):
         super(TextEdit, self).__init__(parent)
-        self.textChanged.connect(self.on_text_changed)
+        self.textChanged.connect(self.onTextChanged)
         self.markup = markups.ReStructuredTextMarkup()
 
-    def open_file(self, path=None):
+    def openFile(self, path=None):
         with open(path, 'r') as f:
             text = f.read()
             self.setText(text)
 
 
-    def on_text_changed(self):
-        self.update_html()
+    def onTextChanged(self):
+        self.updateHtml()
         self.setFocus()
 
-    def update_html(self):
+    def updateHtml(self):
         text = self.toPlainText()
         extra_settings = {'initial_header_level': 4,
                           'doctitle_xform': 0,
@@ -45,6 +45,8 @@ class TextEdit(QTextEdit):
                           }
         try:
             html = publish_parts(text, writer_name='html', settings_overrides=extra_settings)['whole']
+            self.parent().logger.debug(html)
+
             self.parent().previewView.setHtml(html)
             self.parent().showErrorMsg("mark up parse ok!")
         except:
@@ -56,9 +58,6 @@ class TextEdit(QTextEdit):
 class HtmlView(QWebEngineView):
     def __init__(self, parent=None):
         super(HtmlView, self).__init__(parent)
-
-    def load_html(self, path):
-        self.load(QUrl.fromLocalFile(path))
 
 
 class TreeView(QTreeView):
@@ -285,8 +284,7 @@ class MainWindow(QMainWindow):
         full_html_filename = os.path.join(self.prj_path, html_filename)
 
         self.projectTreeView.load_dir(self.prj_path)
-        self.textEdit.open_file(full_filename)
-        # self.htmlview.load_html(full_html_filename)
+        self.textEdit.openFile(full_filename)
 
     def quit(self):
         self.close()
