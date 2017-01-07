@@ -3,6 +3,7 @@
 
 import os
 import sys
+import logging
 
 import markups
 from PyQt5.QtCore import (Qt, QPoint, QSettings, QSize, QUrl)
@@ -91,12 +92,14 @@ class TreeView(QTreeView):
         if indexes:
             new_filename = self.model().data(indexes[0])
             main_win = self.parent().parent()
-            main_win.handle_file_changed(new_filename)
+            main_win.handleFileChanged(new_filename)
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
+        self.log = logging.getLogger(__name__)
 
+        self.readSettings()
         self.textEdit = TextEdit(self)
         self.setCentralWidget(self.textEdit)
 
@@ -106,17 +109,16 @@ class MainWindow(QMainWindow):
         self.createStatusBar()
         self.createDockWindows()
 
-        self.readSettings()
         self.setWindowTitle("Lake Tai")
 
     def createActions(self):
-        self.act_open_prj = QAction(
+        self.openProjectAction = QAction(
             QIcon("images/open.png"), "&Open Project", self,
             shortcut="Ctrl+O",
             statusTip="Open Project",
-            triggered=self.open_prj
+            triggered=self.openProject
         )
-        self.act_quit = QAction(
+        self.QuitAction = QAction(
             QIcon('images/quit.png'), "&Close", self,
             shortcut=QKeySequence.Close,
             statusTip="Quit",
@@ -124,21 +126,43 @@ class MainWindow(QMainWindow):
             menuRole=QAction.QuitRole #  More like OSX native app
         )
 
+        self.recentProjectActions = []
+        settings = self.getSettingsObj()
+        recentProjectsMax = settings.value("recentProjectsMax")
+        for i in range(recentProjectsMax):
+            self.recentProjectActions.append(QAction(self, visible=False, triggered=self.openRecentProject))
+
     def createToolBars(self):
         self.file_toolbar = self.addToolBar("file")
-        self.file_toolbar.addAction(self.act_open_prj)
-        self.file_toolbar.addAction(self.act_quit)
+        self.file_toolbar.addAction(self.openProjectAction)
+        self.file_toolbar.addAction(self.QuitAction)
 
     def createStatusBar(self):
         self.statusBar().showMessage("Ready")
 
     def createMenus(self):
+        # file menu
         self.fileMenu = self.menuBar().addMenu("&File")
-        self.fileMenu.addAction(self.act_open_prj)
-        self.menuBar().addSeparator()
-        self.fileMenu.addAction(self.act_quit)
+        self.fileMenu.addAction(self.QuitAction)
+        self.fileMenu.addAction(self.openProjectAction)
+        # file menu -> recent projects menu
+        self.recentPorjectsMenu = self.fileMenu.addMenu("recent projects")
+        for action in self.recentProjectActions:
+            self.recentPorjectsMenu.addAction(action)
+        self.updateRecentProjectActions()
 
+        # view menu
         self.viewMenu = self.menuBar().addMenu("&View")
+
+    def updateRecentProjectActions(self):
+        settings = self.getSettingsObj()
+        projects = settings.value('recentProjects', [])
+        for action in self.recentProjectActions:
+            action.setVisible(False)
+        for project, action in zip(projects, self.recentProjectActions):
+            action.setText(project)
+            action.setData(project)
+            action.setVisible(True)
 
     def createDockWindows(self):
         # dock for project files
@@ -157,25 +181,49 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.RightDockWidgetArea, dock)
         self.viewMenu.addAction(dock.toggleViewAction())
 
-    def readSettings(self):
+    def getSettingsObj(self):
         settings = QSettings("Dormouse", "LakeTai")
+        return settings
+
+    def readSettings(self):
+        settings = self.getSettingsObj()
         # main window
         self.move(settings.value("mainwin/pos", QPoint(200, 200)))
         self.resize(settings.value("mainwin/size", QSize(400, 400)))
 
+
     def writeSettings(self):
-        settings = QSettings("Dormouse", "LakeTai")
+        settings = self.getSettingsObj()
         # main window
         settings.setValue("mainwin/pos", self.pos())
         settings.setValue("mainwin/size", self.size())
 
+    def openRecentProject(self):
+        action = self.sender()
+        if action:
+            self.openProject(action.data())
+
     def showErrorMsg(self, msg):
         self.statusBar().showMessage(msg)
 
-    def addRecentPrjPath(self, path):
-        settings = QSettings("Dormouse", "LakeTai")
+    def addRecentProject(self, project):
+        settings = self.getSettingsObj()
+        projects = settings.value("recentProjects", [])
+        projectsMax = settings.value("recentProjectsMax", 5)
+        if project in projects:
+            # do nothing
+            return
+        if len(projects) < projectsMax:
+            projects.append(project)
+        if len(projects) == projectsMax:
+            newProjects = projects[1:]
+            newProjects.append(project)
+        settings.setValue("recentProjects", projects)
+        self.updateRecentProjectActions()
 
-    def open_prj(self, prjPath=None):
+
+
+    def openProject(self, prjPath=None):
         default_path = '/Users/dormouse/test'
         if not prjPath:
             options = QFileDialog.Options()
@@ -199,8 +247,8 @@ class MainWindow(QMainWindow):
 
                 # self.setWindowTitle(PRJ_NAME + u' -- ' + conf.project)
                 self.prj_path = prjPath
-                self.addRecentPrjPath(prjPath)
-                self.handle_file_changed()
+                self.addRecentProject(prjPath)
+                self.handleFileChanged()
             else:
                 reply = QMessageBox.information(
                     self,
@@ -212,7 +260,7 @@ class MainWindow(QMainWindow):
                 else:
                     return
 
-    def handle_file_changed(self, filename=None):
+    def handleFileChanged(self, filename=None):
         if not filename:
             filename = DEFAULT_INDEX
         full_filename = os.path.join(self.prj_path, filename)
