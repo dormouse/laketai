@@ -97,7 +97,15 @@ class TreeView(QTreeView):
 class MainWindow(QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
-        self.log = logging.getLogger(__name__)
+        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.DEBUG)
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.DEBUG)
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        ch.setFormatter(formatter)
+        self.logger.addHandler(ch)
 
         self.readSettings()
         self.textEdit = TextEdit(self)
@@ -118,7 +126,13 @@ class MainWindow(QMainWindow):
             statusTip="Open Project",
             triggered=self.openProject
         )
-        self.QuitAction = QAction(
+        self.preferencesAction = QAction(
+            "Preferences...",
+            self,
+            menuRole = QAction.PreferencesRole
+        )
+
+        self.quitAction = QAction(
             QIcon('images/quit.png'), "&Close", self,
             shortcut=QKeySequence.Close,
             statusTip="Quit",
@@ -135,7 +149,7 @@ class MainWindow(QMainWindow):
     def createToolBars(self):
         self.file_toolbar = self.addToolBar("file")
         self.file_toolbar.addAction(self.openProjectAction)
-        self.file_toolbar.addAction(self.QuitAction)
+        self.file_toolbar.addAction(self.quitAction)
 
     def createStatusBar(self):
         self.statusBar().showMessage("Ready")
@@ -143,7 +157,8 @@ class MainWindow(QMainWindow):
     def createMenus(self):
         # file menu
         self.fileMenu = self.menuBar().addMenu("&File")
-        self.fileMenu.addAction(self.QuitAction)
+        self.fileMenu.addAction(self.preferencesAction)
+        self.fileMenu.addAction(self.quitAction)
         self.fileMenu.addAction(self.openProjectAction)
         # file menu -> recent projects menu
         self.recentPorjectsMenu = self.fileMenu.addMenu("recent projects")
@@ -210,6 +225,7 @@ class MainWindow(QMainWindow):
         settings = self.getSettingsObj()
         projects = settings.value("recentProjects", [])
         projectsMax = settings.value("recentProjectsMax", 5)
+
         if project in projects:
             # do nothing
             return
@@ -218,7 +234,7 @@ class MainWindow(QMainWindow):
         if len(projects) == projectsMax:
             newProjects = projects[1:]
             newProjects.append(project)
-        settings.setValue("recentProjects", projects)
+        settings.setValue("recentProjects", newProjects)
         self.updateRecentProjectActions()
 
 
